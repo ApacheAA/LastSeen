@@ -1,30 +1,57 @@
 import asyncio
-from datetime import datetime
-import json
-import os
+from datetime import datetime, timezone
 import pytz
+import sqlite3
 
 import discord
 
-client = discord.Client()
+conn = sqlite3.connect('users_online.db', timeout=5)
+c = conn.cursor()
+q_update = """
+UPDATE id_timestamp
+SET timestamp = ?
+WHERE id = ?"""
+
+on = discord.Status.online
+bot_activity = discord.CustomActivity(name='!lastseen help')
+client = discord.Client(activity=bot_activity)
 
 @client.event
 async def on_ready():
     guild = discord.utils.get(client.guilds, name=guild_name)
     print(guild.name)
+    
     while True:
-        #TODO sqlite instead json
-        with open(bd_path, 'r') as file:
-            users_online = json.load(file)
-            ct = datetime.now().timestamp()
-            cur_online = {str(member.id) : ct
-                          for member in guild.members 
-                          if member.status == discord.Status.online}
-            users_online.update(cur_online)
-        with open(bd_path, 'w') as file:
-            json.dump(users_online, file)
+        ct = datetime.now().timestamp()
+        cur_online = ((ct, member.id) for member in guild.members 
+                      if member.status == discord.Status.online
+                     )
+        c.executemany(q_update, cur_online)
+        conn.commit()
             
         await asyncio.sleep(10)
+
+@client.event
+async def on_typing(channel, user, naive_dt):
+    if channel.type != discord.ChannelType.private:
+        if user.status != on:
+            aware_dt = naive_dt.replace(tzinfo=timezone.utc)
+            c.execute(q_update, (aware_dt.timestamp(), user.id))
+            conn.commit()
+    # TODO use private channel to check online
+    # else:
+        
+@client.event
+async def on_member_join(user):
+    q_newid = """
+    INSERT INTO id_timestamp
+    VALUES (?, ?)"""
+    c.execute(q_newid,
+              (user.id,
+               datetime.now().timestamp()
+              )
+             )
+    conn.commit()        
 
 @client.event
 async def on_message(message):
@@ -32,10 +59,11 @@ async def on_message(message):
         return
     
     bot_call = '!lastseen'
-    help_str = f'''LastSeen commands:
-    {bot_call} help - show available commands.
-    {bot_call} #1111 - show when username#1111 was online.
-    '''
+    help_str = f"""
+    LastSeen commands:
+    `{bot_call} help` - show available commands.
+    `{bot_call} #1111` - show when username#1111 was online.
+    """
     
     text = message.content
     if text.startswith(bot_call):
@@ -56,31 +84,53 @@ async def on_message(message):
                      if member.discriminator == d]
             if req_ms:
                 req_m = req_ms[0]
-                with open(bd_path, 'r') as file:
-                    users_online = json.load(file)
-                msc_tz = pytz.timezone('Europe/Moscow')
-                ts = datetime.fromtimestamp(users_online[str(req_m.id)],
-                                            msc_tz)
-                resp = f'{req_m.name} was online {ts:%Y-%m-%d %H:%M} MSC'
+                q_get = '''
+                SELECT timestamp FROM id_timestamp
+                WHERE id = ?'''
+                res = c.execute(q_get, (req_m.id,))
+                ls_ts = res.fetchone()[0]
+                
+                if ls_ts == -1:
+                    resp = f'Bot has never seen {req_m.name} online'
+                else:    
+                    # TODO user timezone
+                    msc_tz = pytz.timezone('Europe/Moscow')
+                    ls_dt = datetime.fromtimestamp(ls_ts, msc_tz)
+                
+                    resp = (f'{req_m.name} was online '
+                    f'{ls_dt:%Y-%m-%d %H:%M} MSC')
             else:
-                resp = f'Bot has never seen online user with #{d}'
-            
+                resp = f'User with #{d} not found'
+        
+        # TODO
+        #elif command.startswith('MAU'):
+        # TODO 
+        #def last_period_count(timestamps, per)
+        #per = 30
+        #per_start = datetime.now() - timedelta(days=per)
+        #per_count = sum(ts > per_start for ts in timestamps)
+        #elif command.startswith('DAU'):
+        
         else:
-            resp = f"""Unknown command.
-            '{bot_call} help' for awailable commands"""
+            resp = f"""
+            Unknown command.
+            `{bot_call} help` for awailable commands."""
             
         await message.channel.send(resp)
-            
+
+#@client.event
+#async def on_member_update(before, after):
+    # TODO 
+    #elif command.startswith('callme #'):
+    #
+    #if before.status != on and after.status == on:
+    #await message.channel.send(resp)        
+        
 with open('token.txt') as file:
     token = file.read()
     
 with open('guild.txt') as file:
     guild_name = file.read()
-
-bd_path = 'users_online.json'
-if not os.path.exists(bd_path):
-    with open(bd_path, 'w') as file:
-        json.dump({}, file)
 
 client.run(token)
 
