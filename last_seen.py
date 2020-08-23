@@ -13,7 +13,9 @@ SET timestamp = ?
 WHERE id = ?"""
 
 on = discord.Status.online
-bot_activity = discord.CustomActivity(name='!lastseen help')
+listening_type = discord.ActivityType.listening
+bot_activity = discord.Activity(name='!lastseen help',
+                                type=listening_type)
 client = discord.Client(activity=bot_activity)
 
 @client.event
