@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime, timezone
 import pytz
 import sqlite3
@@ -22,16 +21,13 @@ client = discord.Client(activity=bot_activity)
 async def on_ready():
     guild = discord.utils.get(client.guilds, name=guild_name)
     print(guild.name)
-    
-    while True:
+        
+@client.event
+async def on_member_update(before, after):
+    if before.status == on and after.status != on:
         ct = datetime.now().timestamp()
-        cur_online = ((ct, member.id) for member in guild.members 
-                      if member.status == discord.Status.online
-                     )
-        c.executemany(q_update, cur_online)
+        c.execute(q_update, (ct, after.id))
         conn.commit()
-            
-        await asyncio.sleep(10)
 
 @client.event
 async def on_typing(channel, user, naive_dt):
@@ -86,21 +82,24 @@ async def on_message(message):
                      if member.discriminator == d]
             if req_ms:
                 req_m = req_ms[0]
-                q_get = '''
-                SELECT timestamp FROM id_timestamp
-                WHERE id = ?'''
-                res = c.execute(q_get, (req_m.id,))
-                ls_ts = res.fetchone()[0]
+                if req_m.status == on:
+                    resp = f'{req_m.name} is online now'
+                else:
+                    q_get = '''
+                    SELECT timestamp FROM id_timestamp
+                    WHERE id = ?'''
+                    res = c.execute(q_get, (req_m.id,))
+                    ls_ts = res.fetchone()[0]
                 
-                if ls_ts == -1:
-                    resp = f'Bot has never seen {req_m.name} online'
-                else:    
-                    # TODO user timezone
-                    msc_tz = pytz.timezone('Europe/Moscow')
-                    ls_dt = datetime.fromtimestamp(ls_ts, msc_tz)
-                
-                    resp = (f'{req_m.name} was online '
-                    f'{ls_dt:%Y-%m-%d %H:%M} MSC')
+                    if ls_ts == -1:
+                        resp = f'Bot has never seen {req_m.name} online'
+                    else:    
+                        # TODO user timezone
+                        msc_tz = pytz.timezone('Europe/Moscow')
+                        ls_dt = datetime.fromtimestamp(ls_ts, msc_tz)
+                    
+                        resp = (f'{req_m.name} was online '
+                        f'{ls_dt:%Y-%m-%d %H:%M} MSC')
             else:
                 resp = f'User with #{d} not found'
         
