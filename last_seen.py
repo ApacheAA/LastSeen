@@ -77,10 +77,10 @@ async def on_message(message):
         elif command.startswith('#'):
             guild = discord.utils.get(client.guilds, name=guild_name)
             d = command[1:5]
-            # TODO choice for same discriminator
+            
             req_ms = [member for member in guild.members
                      if member.discriminator == d]
-            if req_ms:
+            if len(req_ms) == 1:
                 req_m = req_ms[0]
                 if req_m.status == on:
                     resp = f'{req_m.name} is online now'
@@ -100,6 +100,15 @@ async def on_message(message):
                     
                         resp = (f'{req_m.name} was online '
                         f'{ls_dt:%Y-%m-%d %H:%M} MSC')
+                        
+            if len(req_ms) > 1:
+                m_names = (f'{i + 1} : {m.name}'
+                           for i, m in enumerate(req_ms)
+                          )
+                m_names_str = '\n'.join(m_names)
+                resp = f'''Several users found:
+                {m_names_str}'''
+                # TODO choice for same discriminator
             else:
                 resp = f'User with #{d} not found'
         
