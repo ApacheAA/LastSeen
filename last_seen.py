@@ -1,8 +1,12 @@
 from datetime import datetime, timezone
+from io import BytesIO
+from PIL import Image
 import pytz
 import sqlite3
 
 import discord
+
+from recon import get_name
 
 conn = sqlite3.connect('users_online.db', timeout=5)
 c = conn.cursor()
@@ -127,7 +131,18 @@ async def on_message(message):
             `{bot_call} help` for awailable commands."""
             
         await message.channel.send(resp)
-
+        
+    if text == '!x':
+        await client.close()
+        
+    atts = message.attachments
+    is_dm = message.channel.type == discord.ChannelType.private
+    if atts and is_dm:
+        pic = await atts[0].read()
+        img = Image.open(BytesIO(pic)).convert('RGB')
+        resp = get_name(img)
+        await message.channel.send(resp)
+        
 #@client.event
 #async def on_member_update(before, after):
     # TODO 
