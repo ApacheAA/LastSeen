@@ -6,14 +6,21 @@ import sqlite3
 
 import discord
 
-from recon import get_name
+from recon import ProfileImg
 
+# TODO users_online -> discord_users
 conn = sqlite3.connect('users_online.db', timeout=5)
 c = conn.cursor()
 q_update = """
 UPDATE id_timestamp
 SET timestamp = ?
 WHERE id = ?"""
+
+rdb_conn = sqlite3.connect('rsc_users.db', timeout=5)
+rdbc = rdb_conn.cursor()
+q_add_player = """
+REPLACE INTO wanted (name, crew_tag)
+VALUES (?,?)"""
 
 on = discord.Status.online
 listening_type = discord.ActivityType.listening
@@ -57,6 +64,8 @@ async def on_member_join(user):
 
 @client.event
 async def on_message(message):
+    is_dm = message.channel.type == discord.ChannelType.private
+    
     if message.author == client.user:
         return
     
@@ -134,14 +143,25 @@ async def on_message(message):
         
     if text == '!x':
         await client.close()
-        
+    
+    # recon
+    #######
     atts = message.attachments
-    is_dm = message.channel.type == discord.ChannelType.private
+    
+    # test
     if atts and is_dm:
-        pic = await atts[0].read()
-        img = Image.open(BytesIO(pic)).convert('RGB')
-        resp = get_name(img)
+        img = await atts[0].read()
+        img = Image.open(BytesIO(img)).convert('RGB')
+        img = ProfileImg(img)
+        player = img.recon_player()
+        resp = (f'Name: **{player.name}**\n'
+                f'Crew tag: {player.crew_tag}')
         await message.channel.send(resp)
+        
+    # confirmation
+    
+    # add to DB
+        
         
 #@client.event
 #async def on_member_update(before, after):

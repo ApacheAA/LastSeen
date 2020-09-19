@@ -59,7 +59,7 @@ def recon_name_box(img_arr, return_tag=False):
                              ]
         img_arr = img_arr[:, :tag_box.lx - 4]
         if return_tag:
-            crew_tag = img_to_str(tag_img_arr)
+            crew_tag = img_to_str(tag_img_arr).upper()
     else:
         crew_tag = ''
         
@@ -93,6 +93,9 @@ class ProfileImg:
         self.blue = mode(img_arr[b.uy, b.lx:b.rx],
                     axis=0
                    ).mode[0]
+        
+        #TODO test 
+        #self.is_valid
 
 #    def find_name_box(self):        
         
@@ -104,7 +107,7 @@ class ProfileImg:
         b = self.name_box
         img_arr = self.img_arr[:self.h // 2, self.w // 2:]
         name_img_arr = img_arr[b.uy:b.ly, b.lx:b.rx]
-        return recon_name_box(name_img_arr)
+        return recon_name_box(name_img_arr, return_tag=True)
         
     def recon_session(self):
         # session players

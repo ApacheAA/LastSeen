@@ -1,4 +1,4 @@
 *.txt
-users_online*
+*.db
 __pycache__
 .ipynb_checkpoints
