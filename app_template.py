@@ -4,7 +4,7 @@ client = discord.Client()
 
 @client.event
 async def on_ready():
-    guild = discord.utils.get(client.guilds, name=guild_name)
+    guild = discord.utils.get(client.guilds, id=guild_id)
     print(guild.name)
         
 @client.event
@@ -15,13 +15,13 @@ async def on_message(message):
         return
     
     text = message.content    
-    if text == '!x':
+    if text == '!x' and is_dm:
         await client.close()       
         
 with open('token.txt') as file:
     token = file.read()
     
 with open('guild.txt') as file:
-    guild_name = file.read()
+    guild_id = int(file.read())
 
 client.run(token)

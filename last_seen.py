@@ -159,9 +159,12 @@ async def on_message(message):
         await message.channel.send(resp)
         
     # confirmation
-    
+    # add default reaction
     # add to DB
-        
+
+#confirmation
+#@client.event
+#async def on_reaction_add(reaction, user):
         
 #@client.event
 #async def on_member_update(before, after):
