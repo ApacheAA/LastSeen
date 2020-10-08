@@ -11,7 +11,7 @@ from utils import parse_dt, add_reactions
 CALENDAR_CH = 'ready4gta'
 d_fmt = '%d.%m.%Y MSC'
 
-#digits emoji
+# unicode digit emojis
 # digits from '0' to '9'
 zero_digit_code = zd = 48
 # excluded digits
@@ -20,10 +20,10 @@ excl_digits = [2, 4, 5, 7]
 udkc = '\U0000fe0f\U000020e3'
 emoji_codes = [chr(i) + udkc for i in range(zd, zd + 10)
                if i - zd not in excl_digits]
-# number '10'
+# number '10' emoji
 emoji_codes.append('\U0001f51f')
 
-# digits from 11 to 23
+# custom emojis from '11' to '23'
 custom_emoji_codes = [str(i) for i in range(11, 24)]
 
 

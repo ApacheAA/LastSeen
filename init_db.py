@@ -11,6 +11,7 @@ db_configs.append(db_config('rsc_users.db',
                             crew TEXT,
                             crew_tag TEXT,
                             KDR REAL,
+                            status INTEGER,
                             unique (name)
                             )'''
                            )

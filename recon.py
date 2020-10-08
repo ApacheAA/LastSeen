@@ -1,13 +1,15 @@
 from collections import namedtuple
 from PIL import Image
 from PIL.ImageOps import invert
+from sys import platform
 
 import numpy as np
 from scipy.stats import mode
 import pytesseract as ts
 
-ts.pytesseract.tesseract_cmd = \
-r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+if platform == 'win32':
+    ts.pytesseract.tesseract_cmd = \
+    r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 TS_KW = {'lang':'eng', 'config':'--psm 7'}
 
 class Box:
