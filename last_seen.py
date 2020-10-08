@@ -3,6 +3,7 @@ from io import BytesIO
 from PIL import Image
 import pytz
 import sqlite3
+import sys
 
 import discord
 from discord.ext import tasks
@@ -34,6 +35,11 @@ WHERE name = ?"""
 CALENDAR_CH = 'ready4gta'
 WANTED_CH = 'debug'
 d_fmt = '%d.%m.%Y MSC'
+
+if sys.argv[-1] == '--debug':
+    QUIT_MSG = '!x'
+else:
+    QUIT_MSG = '!quit'
 
 # unicode digit emojis
 # digits from '0' to '9'
@@ -94,8 +100,7 @@ async def on_member_join(user):
 async def on_message(message):
     text = message.content
     is_dm = message.channel.type == discord.ChannelType.private
-    # TODO
-    #dev_msg = message.author.id == dev_id
+    dev_msg = message.author.id == dev_id
     
     # allow auto-reaction flag
     if is_dm:
@@ -164,7 +169,7 @@ async def on_message(message):
                         resp = (f'{req_m.name} was online '
                         f'{ls_dt:%Y-%m-%d %H:%M} MSC')
                         
-            if len(req_ms) > 1:
+            elif len(req_ms) > 1:
                 m_names = (f'{i + 1} : {m.name}'
                            for i, m in enumerate(req_ms)
                           )
@@ -207,9 +212,8 @@ async def on_message(message):
                 f'Crew tag: {player.crew_tag}')
         await message.channel.send(resp)
 
-
     # TODO dev_msg
-    if text == '!x' and is_dm:
+    if text == QUIT_MSG and is_dm and dev_msg:
         await client.close()
         
 # recon confirmation
@@ -278,8 +282,8 @@ with open('token.txt') as file:
 with open('guild.txt') as file:
     guild_id = int(file.read())
     
-#with open('dev_id.txt') as file:
-#    dev_id = int(file.read())
+with open('dev_id.txt') as file:
+    dev_id = int(file.read())
 
 add_date.start()
 client.run(token)
