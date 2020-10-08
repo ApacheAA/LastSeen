@@ -35,6 +35,13 @@ WHERE name = ?"""
 CALENDAR_CH = 'ready4gta'
 WANTED_CH = 'debug'
 d_fmt = '%d.%m.%Y MSC'
+WEEKDAY_NAMES = ['Понедельник', 
+                 'Вторник', 
+                 'Среда', 
+                 'Четверг', 
+                 'Пятница',
+                 'Суббота',
+                 'Воскресенье']
 
 if sys.argv[-1] == '--debug':
     QUIT_MSG = '!x'
@@ -212,7 +219,6 @@ async def on_message(message):
                 f'Crew tag: {player.crew_tag}')
         await message.channel.send(resp)
 
-    # TODO dev_msg
     if text == QUIT_MSG and is_dm and dev_msg:
         await client.close()
         
@@ -256,6 +262,7 @@ async def add_date():
     guild = d_get(client.guilds, id=guild_id)
     ch = d_get(guild.text_channels, name=CALENDAR_CH)
     today = datetime.now().date()
+    # TODO add dates manually
     expected_dates = set(today + timedelta(days=i)
                          for i in range(0, 8))
     av_dates = set()
@@ -269,7 +276,8 @@ async def add_date():
                 
     na_dates = expected_dates.difference(av_dates)
     for d in sorted(na_dates):
-        emb = discord.Embed(title=d.strftime(d_fmt))
+        emb = discord.Embed(title=d.strftime(d_fmt),
+                            description=WEEKDAY_NAMES[d.weekday()])
         await ch.send('_\n\n_', embed=emb)
         
 @add_date.before_loop
