@@ -19,9 +19,21 @@ class Box:
         self.lx = left_x
         self.rx = right_x
         
-    def to_global(self, local_uy=0, local_lx=0):
-        self.uy += local_uy
-        self.lx += local_lx
+    def get_global(self, local_uy=0, local_lx=0):
+        '''
+        Returns
+        -------
+        uy, ly, lx, rx
+        '''
+        return (self.uy + local_uy,
+                self.ly + local_uy, 
+                self.lx + local_lx, 
+                self.rx + local_lx)
+        
+    def check_size(self, min_height=5, min_length=10):
+        valid_h = self.ly > self.uy + min_height
+        valid_l = self.rx > self.lx + min_length
+        return valid_h & valid_l
 
 def infer_blue_mask(img_arr):
     r_idx, g_idx, b_idx = (np.s_[:, :, i] for i in range(3))
@@ -39,12 +51,29 @@ def infer_white_mask(img_arr):
     return white_mask
 
 def max_length_rectangle(mask):
-    rows_m = mode(np.cumsum(~mask, axis=1), axis=1)
-    max_length = rows_m.count.max()
-    row_idxs = np.nonzero(rows_m.count.flatten() == max_length)[0]
+    '''
+    Returns
+    -------
+    upper_y, lower_y, left_x, right_x : int
+    '''
+    row_subseries_ids = np.cumsum(~mask, axis=1)
+    row_modes, row_counts = mode(row_subseries_ids, axis=1)
+    # subseries obtained from cumsum includes exactly one False
+    # as first element, so -1 required
+    row_counts = row_counts.flatten() - 1
+    max_length = row_counts.max()
+    
+    # for all False mask
+    if max_length == 0:
+        return (0,) * 4
+    
+    # all rows with max_length
+    row_idxs = np.nonzero(row_counts == max_length)[0]
     upper_y = row_idxs[0]
     lower_y = row_idxs[-1]
-    left_x = rows_m.mode.flatten()[upper_y]
+    mode_mask = (row_subseries_ids == row_modes)[upper_y]
+    # subseries starts with exactly one False, so +1 required
+    left_x = np.nonzero(mode_mask)[0][0] + 1
     right_x = left_x + max_length
     return upper_y, lower_y, left_x, right_x        
         
@@ -84,17 +113,25 @@ def img_to_str(img_arr, invert=False):
 class ProfileImg:
     
     def __init__(self, img):
+        '''
+        Parameters
+        ----------
+        img : PIL.Image
+        '''
+
         self.img_arr = np.asarray(img)
         self.h, self.w, self.ch = self.img_arr.shape
         img_arr = self.img_arr[:self.h // 2, self.w // 2:]
         blue_mask = infer_blue_mask(img_arr)
         self.name_box = Box(*max_length_rectangle(blue_mask))
-        
-        # certain blue color
         b = self.name_box
-        self.blue = mode(img_arr[b.uy, b.lx:b.rx],
-                    axis=0
-                   ).mode[0]
+        self.name_box_found = b.check_size()
+
+        if self.name_box_found:
+            # certain blue color
+            self.blue = mode(img_arr[b.uy, b.lx:b.rx],
+                        axis=0
+                       ).mode[0]
         
         #TODO test 
         #self.is_valid
@@ -134,7 +171,7 @@ class ProfileImg:
             player = recon_name_box(name_img_arr, return_tag=True)
             sess_players.append(player)
             
-        return sess_players        
+        return sess_players
 
 def get_name(img):
     img_arr = np.asarray(img)

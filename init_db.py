@@ -6,14 +6,16 @@ from collections import namedtuple
 db_config = namedtuple('DBConfig', ['path', 'q_init'])
 db_configs = []
 db_configs.append(db_config('rsc_users.db',
-                            '''CREATE TABLE wanted (
+                            '''
+                            CREATE TABLE wanted (
                             name TEXT,
                             crew TEXT,
                             crew_tag TEXT,
                             KDR REAL,
                             status INTEGER,
                             unique (name)
-                            )'''
+                            )
+                            '''
                            )
                  )
 
