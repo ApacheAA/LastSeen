@@ -30,3 +30,5 @@ member.display_name
 - [x] wanted confirmation
 - [ ] session notifications
 - [ ] handle duplicated recon messages
+- [ ] handle empty edit arguments
+- [ ] RSC profile screenshot

@@ -203,9 +203,10 @@ async def on_message(message):
         if img.name_box_found:
             player = img.recon_player()
             emb = discord.Embed(title=esc_md(player.name))
-            emb.add_field(name='Crew tag',
-                          value=esc_md(player.crew_tag),
-                          inline=False)
+            if player.crew_tag:
+                emb.add_field(name='Crew tag',
+                              value=esc_md(player.crew_tag),
+                              inline=False)
             emb.add_field(name='Image ID',
                           value=str(message.id),
                           inline=False)

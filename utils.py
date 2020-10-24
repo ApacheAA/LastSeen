@@ -95,7 +95,7 @@ async def check_reaction(message, emoji, user):
 
 async def edit_wanted_embed(message, command):
     emb = message.embeds[0]
-
+    #TODO empty argument handling
     c = '!name'
     if command.startswith(c):
         emb.title = command[len(c) + 1 :]
