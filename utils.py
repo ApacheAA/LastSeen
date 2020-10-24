@@ -23,14 +23,14 @@ async def add_reactions(message, emoji_codes, custom_emoji_codes):
     for ce in custom_emojis:
         await message.add_reaction(ce)
 
-async def add_calendar_reactions(message):
+async def add_calendar_reactions(message, date_fmt):
     '''
     Check message and add reactions if applicable.
     '''
     embs = message.embeds
     if embs:
         title = embs[0].title
-        date = parse_dt(title, d_fmt)
+        date = parse_dt(title, date_fmt)
 
         if date:
             await add_reactions(message,
@@ -58,6 +58,8 @@ class RSCDB:
     def __init__(self, db_path):
         self.conn = sqlite3.connect(db_path, timeout=5)
         self.c = self.conn.cursor()
+
+        #TODO init table
 
         self.q_add_player = """
         REPLACE INTO wanted (name, crew_tag, status)
@@ -144,3 +146,17 @@ def get_emoji_count(message, emoji, custom=True):
     # TODO
     #else:
     return count
+
+def debug_channel_dialogue(ch_names):
+
+    ch_selector = dict(enumerate(ch_names))
+    ch_selector = {str(k) : v for k,v in ch_selector.items()}
+    ch_resp = input((f'Choose number of channel to debug\n'
+                     f'{ch_selector}\n')
+                   )
+
+    if ch_resp in ch_selector:
+        return ch_selector[ch_resp]
+    else:
+        print('Incorrect number')
+        return debug_channel_dialogue(ch_names)

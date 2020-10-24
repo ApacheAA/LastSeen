@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from functools import partial
 from io import BytesIO
 from PIL import Image
 import pytz
@@ -8,11 +9,25 @@ import sys
 import discord
 from discord.ext import tasks
 from discord.utils import get as d_get
+from discord.utils import escape_markdown as esc_md
 
+import emoji_utils
+import bot_messages
 from recon import ProfileImg
-from utils import parse_dt, add_reactions
+from utils import (parse_dt,
+                   add_reactions,
+                   RSCDB,
+                   add_calendar_reactions,
+                   add_wanted_reactions,
+                   check_reaction,
+                   edit_wanted_embed,
+                   ChannelIdentifier,
+                   get_emoji_count,
+                   handle_status,
+                   debug_channel_dialogue)
 
 # TODO multiserver: db for each guild
+# TODO class DUDB
 conn = sqlite3.connect('discord_users.db', timeout=5)
 c = conn.cursor()
 q_update = """
@@ -20,21 +35,16 @@ UPDATE id_timestamp
 SET timestamp = ?
 WHERE id = ?"""
 
-rdb_conn = sqlite3.connect('rsc_users.db', timeout=5)
-rdbc = rdb_conn.cursor()
-q_add_player = """
-REPLACE INTO wanted (name, crew_tag, status)
-VALUES (?,?,?)"""
-q_set_status = """
-UPDATE wanted
-SET status = ? 
-WHERE name = ?"""
+rscdb = RSCDB('rsc_users.db')
+edit_commands = ['!name', '!tag']
 
 # TODO command for add new channel with calendar
 # with arbitrary planning days, timezone
-CALENDAR_CH = 'ready4gta'
-WANTED_CH = 'debug'
-d_fmt = '%d.%m.%Y MSC'
+# TODO use channel.id instead channel names
+CH_NAMES = {'wanted' : 'wanted',
+            'calendar' : 'ready4gta'}
+
+DATE_FMT = '%d.%m.%Y MSC'
 WEEKDAY_NAMES = ['Понедельник', 
                  'Вторник', 
                  'Среда', 
@@ -44,24 +54,11 @@ WEEKDAY_NAMES = ['Понедельник',
                  'Воскресенье']
 
 if sys.argv[-1] == '--debug':
+    debug_ch = debug_channel_dialogue(CH_NAMES)
+    CH_NAMES[debug_ch] = 'debug'
     QUIT_MSG = '!x'
 else:
     QUIT_MSG = '!quit'
-
-# unicode digit emojis
-# digits from '0' to '9'
-zero_digit_code = zd = 48
-# excluded digits
-excl_digits = [2, 4, 5, 7]
-# unicode digit keycap
-udkc = '\U0000fe0f\U000020e3'
-emoji_codes = [chr(i) + udkc for i in range(zd, zd + 10)
-               if i - zd not in excl_digits]
-# number '10' emoji
-emoji_codes.append('\U0001f51f')
-
-# custom emojis from '11' to '23'
-custom_emoji_codes = [str(i) for i in range(11, 24)]
 
 on = discord.Status.online
 listening_type = discord.ActivityType.listening
@@ -101,43 +98,36 @@ async def on_member_join(user):
                datetime.now().timestamp()
               )
              )
-    conn.commit()        
+    conn.commit()
 
 @client.event
 async def on_message(message):
     text = message.content
-    is_dm = message.channel.type == discord.ChannelType.private
     dev_msg = message.author.id == dev_id
-    
-    # allow auto-reaction flag
-    if is_dm:
-        aar_flag = False
-    else:
-        # TODO extend auto-reaction conditions
-        aar_flag = message.channel.name == CALENDAR_CH
+    bot_msg = message.author == client.user
+    chid = ChannelIdentifier(message, CH_NAMES)
+
+    if text == QUIT_MSG and chid.is_dm and dev_msg:
+        await client.close()
     
     # auto-reactions
-    if message.author == client.user:
-        if aar_flag and message.embeds:
-            title = message.embeds[0].title
-            date = parse_dt(title, d_fmt)
-            
-            if date:
-                await add_reactions(message,
-                                    emoji_codes,
-                                    custom_emoji_codes
-                                   )
-        else:
-            return
+    if bot_msg and chid.allow_ar:
+        if chid.calendar:
+            await add_calendar_reactions(message, DATE_FMT)
+        elif chid.wanted:
+            await add_wanted_reactions(message)
+    elif bot_msg:
+        return
     
     # help
+    #TODO move to bot_messages
     bot_call = '!lastseen'
-    help_str = f"""
-    LastSeen commands:
-    `{bot_call} help` - show available commands.
-    `{bot_call} #1111` - show when username#1111 was online.
-    """
-    
+    help_str = (f'LastSeen commands:\n'
+                f'`{bot_call} help` - show available commands.\n'
+                f'`{bot_call} #1111` - show when username#1111 '
+                'was online.'
+               )
+
     # commands
     if text.startswith(bot_call):
         c_start = len(bot_call) + 1
@@ -197,56 +187,146 @@ async def on_message(message):
         #elif command.startswith('DAU'):
         
         else:
-            resp = f"""
-            Unknown command.
-            `{bot_call} help` for awailable commands."""
-            
+            resp = ('Unknown command.\n'
+                    f'`{bot_call} help` for awailable commands.'
+                   )
+
         await message.channel.send(resp)
     
-# recon
+    # recon
     atts = message.attachments
     
-    # test
-    # TODO
-    #is_wanted_ch = msg.channel.name == WANTED_CH
-    if atts and is_dm:
+    if atts and chid.wanted:
         img = await atts[0].read()
         img = Image.open(BytesIO(img)).convert('RGB')
         img = ProfileImg(img)
-        player = img.recon_player()
-        # TODO as embed
-        resp = (f'Name: **{player.name}**\n'
-                f'Crew tag: {player.crew_tag}')
-        await message.channel.send(resp)
+        if img.name_box_found:
+            player = img.recon_player()
+            emb = discord.Embed(title=esc_md(player.name))
+            emb.add_field(name='Crew tag',
+                          value=esc_md(player.crew_tag),
+                          inline=False)
+            emb.add_field(name='Image ID',
+                          value=str(message.id),
+                          inline=False)
+            await message.channel.send(embed=emb)
+        else:
+            await message.channel.send('Image was not recognized')
 
-    if text == QUIT_MSG and is_dm and dev_msg:
-        await client.close()
-        
+    # edit last recon message
+    if chid.wanted:
+        is_edit_command = any(text.startswith(c) for c in edit_commands)
+        if is_edit_command:
+            msgs = message.channel.history(limit=20)
+            check_editor = partial(check_reaction,
+                                   emoji=emoji_utils.edit,
+                                   user=message.author)
+            msg = await msgs.find(check_editor)
+            if msg is not None:
+                text = esc_md(text)
+                await edit_wanted_embed(msg, text)
+            else:
+                ch = message.channel
+                await ch.send('Message to edit was not selected')
+
 # recon confirmation
-#@client.event
-#async def on_reaction_add(reaction, user):
-#    msg = reaction.message
-#    bot_msg = msg.author == client.user
-#    is_wanted_ch = msg.channel.name == WANTED_CH
-#    if bot_msg and is_wanted_ch:
-#    # add default reactions: 'plus', 'minus'
-#    
-#    # add to DB
-#        name = msg.embed.title
-#        crew_tag = d_get(msg.fields, name='crew_tag').value
-#        rdbc.execute(q_add_player, (name, crew_tag, 1))
-#        rdb_conn.commit()
-#    
-#    # set status
-#        if reaction.emoji ==# plus
-#            on = # plus_count > minus_count
-#            if on:
-#                rdbc.execute(q_set_status, (1, name))
-#            
-#        if reaction.emoji ==# minus
-#            off = # minus_count > plus_count
-#            if off:
-#                rdbc.execute(q_set_status, (0, name))
+@client.event
+async def on_raw_reaction_add(payload):
+
+    # ignore bot reactions
+    if payload.user_id == client.user.id:
+        return
+
+    guild = d_get(client.guilds, id=payload.guild_id)
+    ch = d_get(guild.channels, id=payload.channel_id)
+    msg = await ch.fetch_message(payload.message_id)
+    bot_msg = msg.author == client.user
+    chid = ChannelIdentifier(msg, CH_NAMES)
+    embs = msg.embeds
+    # TODO more specific condition than just embed
+    # like embed field name
+    wanted_reactions = bot_msg and chid.wanted and embs
+
+    if wanted_reactions:
+        emojis = (r.emoji for r in msg.reactions)
+        initial_recon = emoji_utils.edit in emojis
+        is_edit = payload.emoji.name == emoji_utils.edit
+
+        is_plus, is_minus = (payload.emoji.name == r
+                             for r in emoji_utils.vote)
+        is_vote = is_plus or is_minus
+
+        # remove dsicord markdown escape character
+        name = embs[0].title.replace('\\', '')
+
+        if initial_recon and is_plus:
+            # add to DB
+            # remove dsicord markdown escape character
+            crew_tag = (d_get(embs[0].fields, name='Crew tag')
+                        .value
+                        .replace('\\', '')
+                       )
+            rscdb.add_player(name, crew_tag)
+            # remove edit
+            edit_r = d_get(msg.reactions, emoji=emoji_utils.edit)
+            await edit_r.clear()
+
+        elif initial_recon and is_minus:
+            # remove image
+            img_id = int(d_get(embs[0].fields, name='Image ID').value)
+            img_msg = await ch.fetch_message(img_id)
+            await img_msg.delete()
+
+            # remove message
+            await msg.delete()
+
+        elif initial_recon and is_edit:
+            resp = bot_messages.edit
+            await msg.channel.send(resp)
+
+        elif is_vote:
+            plus_c, minus_c = (get_emoji_count(msg,
+                                               emj,
+                                               custom=True)
+                               for emj in emoji_utils.vote)
+            handle_status(rscdb, name, plus_c, minus_c)
+
+@client.event
+async def on_raw_reaction_remove(payload):
+
+    # ignore bot reactions
+    if payload.user_id == client.user.id:
+        return
+
+    guild = d_get(client.guilds, id=payload.guild_id)
+    ch = d_get(guild.channels, id=payload.channel_id)
+    msg = await ch.fetch_message(payload.message_id)
+    bot_msg = msg.author == client.user
+    chid = ChannelIdentifier(msg, CH_NAMES)
+    embs = msg.embeds
+    # TODO more specific condition than just embed
+    # like embed field name
+    wanted_reactions = bot_msg and chid.wanted and embs
+
+    if wanted_reactions:
+        is_vote = False
+        is_vote = any(payload.emoji.name == r
+                      for r in emoji_utils.vote)
+        name = embs[0].title.replace('\\', '')
+        is_edit = payload.emoji.name == emoji_utils.edit
+
+        if is_vote:
+            plus_c, minus_c = (get_emoji_count(msg,
+                                               emj,
+                                               custom=True)
+                               for emj in emoji_utils.vote)
+            handle_status(rscdb, name, plus_c, minus_c)
+
+        #elif is_edit:
+        # TODO remove edit commands
+        #msgs = message.channel.history(limit=20)
+        #for msg in msgs.filter(check_edit_commands):
+        #    await msg.delete()
         
 # callme        
 #@client.event
@@ -260,7 +340,8 @@ async def on_message(message):
 @tasks.loop(hours=24)
 async def add_date():
     guild = d_get(client.guilds, id=guild_id)
-    ch = d_get(guild.text_channels, name=CALENDAR_CH)
+    ch = d_get(guild.text_channels,
+               name=CH_NAMES['calendar'])
     today = datetime.now().date()
     # TODO add dates manually
     expected_dates = set(today + timedelta(days=i)
@@ -269,27 +350,27 @@ async def add_date():
     async for msg in ch.history(limit=8):
         if msg.author == client.user and msg.embeds:
             title = msg.embeds[0].title
-            dt = parse_dt(title, d_fmt)
+            dt = parse_dt(title, DATE_FMT)
             
             if dt:
                 av_dates.add(dt.date())
                 
     na_dates = expected_dates.difference(av_dates)
     for d in sorted(na_dates):
-        emb = discord.Embed(title=d.strftime(d_fmt),
+        emb = discord.Embed(title=d.strftime(DATE_FMT),
                             description=WEEKDAY_NAMES[d.weekday()])
         await ch.send('_\n\n_', embed=emb)
         
 @add_date.before_loop
 async def before():
-    await client.wait_until_ready()    
-    
+    await client.wait_until_ready() 
+
 with open('token.txt') as file:
     token = file.read()
-    
+
 with open('guild.txt') as file:
     guild_id = int(file.read())
-    
+
 with open('dev_id.txt') as file:
     dev_id = int(file.read())
 

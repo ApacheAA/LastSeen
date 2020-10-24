@@ -9,13 +9,24 @@ member.display_name
 ```
 
 # roadmap
+## general
+- [ ] multiple server mode
+- [ ] discord name : rsc name, timezone, PC specs
+
+## devops
 - [ ] dockerfile for container
 - [ ] test messages for bot
-- [ ] colors for embeding
-- [ ] multiple server mode
-- [ ] discord name : rsc name
-- [ ] calendar notifications
-- [ ] wanted confirmation
-- [ ] session notifications
-- [ ] ambigious discriminator handling
 - [ ] minimize bot rights
+
+## activity
+- [ ] ambigious discriminator handling
+- [ ] DAU, MAU server/GTA
+
+## calendar
+- [ ] calendar notifications
+- [ ] colors for calendar embeding
+
+## wanted
+- [x] wanted confirmation
+- [ ] session notifications
+- [ ] handle duplicated recon messages
