@@ -45,9 +45,9 @@ def infer_blue_mask(img_arr):
 
 def infer_white_mask(img_arr):
     white_mask = np.all(img_arr > 225, axis=2)
-    max_c = np.max(img_arr, axis=2)
-    min_c = np.min(img_arr, axis=2)
-    white_mask &= (max_c - min_c) < 10
+    #max_c = np.max(img_arr, axis=2)
+    #min_c = np.min(img_arr, axis=2)
+    #white_mask &= (max_c - min_c) < 10
     return white_mask
 
 def max_length_rectangle(mask):
