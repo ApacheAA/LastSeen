@@ -3,6 +3,7 @@ import sqlite3
 
 import discord
 from discord.utils import get as d_get
+from discord.utils import escape_markdown as esc_md
 
 import emoji_utils
 
@@ -12,7 +13,21 @@ def parse_dt(s, fmt):
         return dt
     except ValueError:
         return False
-    
+
+def format_embed(string, empty_str='_  _'):
+    '''Format string inplace for discord.Embed'''
+    if string:
+        return esc_md(string)
+    else:
+        return empty_str
+
+def parse_embed(string, empty_str='_  _'):
+    '''Parse attribute from discord.Embed values'''
+    if string == empty_str:
+        return ''
+    else:
+        return string.replace('\\', '')
+
 async def add_reactions(message, emoji_codes, custom_emoji_codes):
     for ec in emoji_codes:
         await message.add_reaction(ec)
@@ -95,17 +110,18 @@ async def check_reaction(message, emoji, user):
 
 async def edit_wanted_embed(message, command):
     emb = message.embeds[0]
-    #TODO empty argument handling
+
     c = '!name'
     if command.startswith(c):
-        emb.title = command[len(c) + 1 :]
+        emb.title = format_embed(command[len(c) + 1 :])
 
     c = '!tag'
     #TODO elif
     if command.startswith(c):
+        crew_tag = format_embed(command[len(c) + 1 :])
         emb.set_field_at(0,
                          name='Crew tag',
-                         value=command[len(c) + 1 :])
+                         value=crew_tag)
 
     await message.edit(embed=emb)
 

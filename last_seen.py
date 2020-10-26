@@ -9,13 +9,13 @@ import sys
 import discord
 from discord.ext import tasks
 from discord.utils import get as d_get
-from discord.utils import escape_markdown as esc_md
 
 import emoji_utils
 import bot_messages
-from recon import ProfileImg
+from recon import ProfileImg, Player
 from utils import (parse_dt,
-                   add_reactions,
+                   format_embed,
+                   parse_embed,
                    RSCDB,
                    add_calendar_reactions,
                    add_wanted_reactions,
@@ -202,11 +202,12 @@ async def on_message(message):
         img = ProfileImg(img)
         if img.name_box_found:
             player = img.recon_player()
-            emb = discord.Embed(title=esc_md(player.name))
-            if player.crew_tag:
-                emb.add_field(name='Crew tag',
-                              value=esc_md(player.crew_tag),
-                              inline=False)
+            player.name = format_embed(player.name)
+            player.crew_tag = format_embed(player.crew_tag)
+            emb = discord.Embed(title=player.name)
+            emb.add_field(name='Crew tag',
+                          value=player.crew_tag,
+                          inline=False)
             emb.add_field(name='Image ID',
                           value=str(message.id),
                           inline=False)
@@ -224,7 +225,6 @@ async def on_message(message):
                                    user=message.author)
             msg = await msgs.find(check_editor)
             if msg is not None:
-                text = esc_md(text)
                 await edit_wanted_embed(msg, text)
             else:
                 ch = message.channel
@@ -252,21 +252,18 @@ async def on_raw_reaction_add(payload):
         emojis = (r.emoji for r in msg.reactions)
         initial_recon = emoji_utils.edit in emojis
         is_edit = payload.emoji.name == emoji_utils.edit
-
         is_plus, is_minus = (payload.emoji.name == r
                              for r in emoji_utils.vote)
         is_vote = is_plus or is_minus
 
-        # remove dsicord markdown escape character
-        name = embs[0].title.replace('\\', '')
+        name = parse_embed(embs[0].title)
 
         if initial_recon and is_plus:
             # add to DB
-            # remove dsicord markdown escape character
-            crew_tag = (d_get(embs[0].fields, name='Crew tag')
-                        .value
-                        .replace('\\', '')
-                       )
+            # remove discord markdown escape character
+            crew_tag = parse_embed(d_get(embs[0].fields,
+                                         name='Crew tag').value
+                                  )
             rscdb.add_player(name, crew_tag)
             # remove edit
             edit_r = d_get(msg.reactions, emoji=emoji_utils.edit)

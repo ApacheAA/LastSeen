@@ -1,8 +1,9 @@
-from collections import namedtuple
+from dataclasses import dataclass
 from PIL import Image
 from PIL.ImageOps import invert
 from sys import platform
 
+from discord.utils import escape_markdown as esc_md
 import numpy as np
 from scipy.stats import mode
 import pytesseract as ts
@@ -34,6 +35,11 @@ class Box:
         valid_h = self.ly > self.uy + min_height
         valid_l = self.rx > self.lx + min_length
         return valid_h & valid_l
+
+@dataclass
+class Player:
+    name: str
+    crew_tag: str
 
 def infer_blue_mask(img_arr):
     r_idx, g_idx, b_idx = (np.s_[:, :, i] for i in range(3))
@@ -78,7 +84,6 @@ def max_length_rectangle(mask):
     return upper_y, lower_y, left_x, right_x        
         
 def recon_name_box(img_arr, return_tag=False):
-    player = namedtuple('Player', ('name', 'crew_tag'))
     
     #tag box handling
     white_mask = infer_white_mask(img_arr)
@@ -97,7 +102,7 @@ def recon_name_box(img_arr, return_tag=False):
     name = img_to_str(img_arr, invert=True)
     
     if return_tag:
-        return player(name, crew_tag)
+        return Player(name, crew_tag)
     else:
         return name        
 
