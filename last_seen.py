@@ -64,7 +64,9 @@ on = discord.Status.online
 listening_type = discord.ActivityType.listening
 bot_activity = discord.Activity(name='!lastseen help',
                                 type=listening_type)
-client = discord.Client(activity=bot_activity)
+
+intents = discord.Intents.all()
+client = discord.Client(activity=bot_activity, intents=intents)
 
 @client.event
 async def on_ready():
