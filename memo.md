@@ -13,6 +13,9 @@ member.display_name
 - [ ] multiple server mode
 - [ ] discord name : rsc name, timezone, PC specs
 
+## database
+- [ ] API class for discord_users.db
+
 ## devops
 - [ ] dockerfile for container
 - [ ] test messages for bot

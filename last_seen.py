@@ -29,7 +29,12 @@ from utils import (parse_dt,
 # TODO multiserver: db for each guild
 # TODO class DUDB
 conn = sqlite3.connect('discord_users.db', timeout=5)
+# TODO
+#conn.row_factory = lambda cursor, row: row[0]
 c = conn.cursor()
+q_newid = """
+INSERT INTO id_timestamp
+VALUES (?, ?)"""
 q_update = """
 UPDATE id_timestamp
 SET timestamp = ?
@@ -71,6 +76,15 @@ client = discord.Client(activity=bot_activity, intents=intents)
 @client.event
 async def on_ready():
     guild = d_get(client.guilds, id=guild_id)
+    # add never seen users
+    ids = set(m.id for m in guild.members)
+    q_get_ids = 'SELECT id FROM id_timestamp'
+    res = c.execute(q_get_ids)
+    av_ids = set(r[0] for r in res.fetchall())
+    na_ids = ids.difference(av_ids)
+    rows = [(i, -1) for i in na_ids]
+    c.executemany(q_newid, rows)
+    conn.commit()
     print(guild.name)
         
 @client.event
@@ -92,9 +106,6 @@ async def on_typing(channel, user, naive_dt):
         
 @client.event
 async def on_member_join(user):
-    q_newid = """
-    INSERT INTO id_timestamp
-    VALUES (?, ?)"""
     c.execute(q_newid,
               (user.id,
                datetime.now().timestamp()
