@@ -17,9 +17,10 @@ member.display_name
 - [ ] API class for discord_users.db
 
 ## devops
-- [ ] dockerfile for container
+- [x] dockerfile for container
 - [ ] test messages for bot
 - [ ] minimize bot rights
+- [ ] db backup
 
 ## activity
 - [ ] ambigious discriminator handling
